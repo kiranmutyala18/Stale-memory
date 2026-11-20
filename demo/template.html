@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StaleMem</title>
+<meta name="description" content="A benchmark for when an AI assistant should trust, check, or drop something it remembers about you.">
+<style>
+:root{--bg:#0e1013;--panel:#16191e;--ink:#ece8dd;--mut:#9a978c;--line:#2a2e35;--amber:#f2b441;--good:#4fd1b5;--bad:#ff6b5e;--grey:#7b8089;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.col{max-width:760px;margin:0 auto;padding:0 20px}
+.wide{max-width:1040px;margin:0 auto;padding:0 20px}
+a{color:inherit}
+h1,h2{font-family:var(--serif);font-weight:500;letter-spacing:-.02em;line-height:1.08;margin:0}
+h2{font-size:clamp(1.7rem,4.4vw,2.5rem);margin-bottom:12px}
+p{margin:0 0 14px}
+.mono,.lab{font-family:var(--mono)}
+.lab{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:0 0 14px;display:block}
+.mut{color:var(--mut)}
+.small{font-size:.88rem}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+.bar{border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.78rem;letter-spacing:.08em}
+.bar .wide{display:flex;gap:22px;height:48px;align-items:center;overflow-x:auto;white-space:nowrap}
+.bar b{color:var(--amber);margin-right:auto;letter-spacing:.14em}
+.bar a{color:var(--mut);text-decoration:none;text-transform:uppercase}
+.bar a:hover{color:var(--ink)}
+
+.hero{padding:84px 0 40px}
+.hero h1{font-size:clamp(2.6rem,8vw,5.2rem);letter-spacing:-.035em}
+.hero h1 span{color:var(--mut)}
+.hero h1 em{font-style:italic;color:var(--amber)}
+.lede{font-size:1.18rem;color:var(--mut);margin-top:26px;max-width:56ch}
+.chip{margin-top:38px;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
+.chip .t{font-family:var(--mono);font-size:.78rem;color:var(--mut);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.chip .f{font-family:var(--serif);font-size:1.5rem;margin:8px 0 12px}
+.fade{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--good),var(--amber) 55%,var(--bad));opacity:.9}
+.chip .scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.7rem;color:var(--mut);margin-top:6px}
+
+section{padding:70px 0 6px;scroll-margin-top:10px}
+.verdict{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:26px 0 8px}
+.verdict>div{padding:22px 18px;border-right:1px solid var(--line)}
+.verdict>div:last-child{border-right:0}
+.verdict .n{font-family:var(--serif);font-size:clamp(3rem,9vw,5.2rem);line-height:1;letter-spacing:-.04em}
+.verdict .n.bad{color:var(--bad)} .verdict .n.ok{color:var(--good)}
+.verdict .k{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-top:10px}
+.verdict .s{font-size:.9rem;color:var(--mut);margin-top:6px}
+@media(max-width:640px){.verdict{grid-template-columns:1fr}.verdict>div{border-right:0;border-bottom:1px solid var(--line)}.verdict>div:last-child{border-bottom:0}}
+
+.map{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 14px 10px;overflow-x:auto}
+svg.chart{width:100%;min-width:700px;height:auto;display:block}
+svg.chart text{fill:var(--mut);font:11px var(--mono)}
+svg.chart .zone{fill:#fff}
+svg.chart .lane{fill:var(--ink);font:600 12px var(--mono);letter-spacing:.06em}
+svg.chart .dot{cursor:pointer;stroke:var(--panel);stroke-width:2;transition:r .12s}
+svg.chart .dot:hover{r:9}
+svg.chart .row{stroke:var(--line)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.82rem;color:var(--mut);margin:12px 4px 4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+
+.notes{list-style:none;padding:0;margin:30px 0 0;counter-reset:n}
+.notes li{counter-increment:n;padding:18px 0 18px 54px;border-top:1px solid var(--line);position:relative}
+.notes li::before{content:counter(n,decimal-leading-zero);position:absolute;left:0;top:19px;font-family:var(--mono);color:var(--amber);font-size:.85rem}
+.notes b{font-family:var(--serif);font-weight:600;font-size:1.12rem}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+select{max-width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:.95rem}
+.mem{border-left:3px solid var(--amber);padding:2px 0 2px 14px;margin:18px 0 12px}
+.mem div{font-family:var(--serif);font-size:1.15rem}
+.mem small{font-family:var(--mono);color:var(--mut);font-size:.74rem}
+.bubble{display:inline-block;background:var(--line);border-radius:16px 16px 16px 4px;padding:9px 15px;margin:4px 0 6px}
+.compare{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+@media(max-width:900px){.compare{grid-template-columns:1fr}}
+.reply{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--bg)}
+.reply h3{margin:0 0 8px;font:600 .74rem var(--mono);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:var(--mut)}
+.tag{padding:2px 9px;border-radius:999px;font:600 .7rem var(--mono);letter-spacing:.03em;text-transform:none}
+.t-ok{background:#12372f;color:var(--good)} .t-bad{background:#4a1c18;color:var(--bad)} .t-grey{background:#2a2d33;color:var(--grey)}
+.txt{white-space:pre-wrap;font-size:.95rem;line-height:1.7}
+mark{background:none;border-bottom:2px solid;padding:0 1px;color:inherit}
+mark.stale{border-color:var(--bad);background:#ff6b5e22} mark.hedge{border-color:var(--good);background:#4fd1b522}
+details summary{cursor:pointer;color:var(--mut);font-size:.88rem;margin-top:14px}
+details pre{white-space:pre-wrap;font:.78rem var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--mut)}
+
+.cases{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.cc{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel)}
+.cc h3{margin:0 0 6px;display:flex;justify-content:space-between;font:600 .74rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+.cc ul{margin:4px 0 8px;padding-left:1.1rem;font-size:.92rem}
+.cc .q{font-size:.92rem;border-left:2px solid var(--line);padding-left:10px;margin:8px 0;color:var(--mut)}
+.acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:18px 0 22px}
+.acts div{border:1px solid var(--line);border-radius:12px;padding:12px;font-size:.88rem;color:var(--mut)}
+.acts b{display:block;font:600 .85rem var(--mono);color:var(--amber);margin-bottom:2px}
+ul.g{padding-left:1.1rem;margin:0 0 14px} ul.g li{margin:6px 0}
+footer{padding:60px 0 70px;color:var(--mut);font-size:.85rem;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="bar"><div class="wide"><b>STALEMEM</b><a href="#map">Decay map</a><a href="#replies">Replies</a><a href="#cases">Cases</a><a href="#method">Method</a></div></div>
+
+<header class="hero"><div class="col">
+  <span class="lab">Benchmark in progress · assistant memory</span>
+  <h1>It was true <em>when you said it.</em> <span>Is it still?</span></h1>
+  <p class="lede">An assistant that says &ldquo;good luck with your interview tomorrow&rdquo; three weeks after it happened is worse than one with no memory. StaleMem tests whether assistants trust, check, or drop what they remember as time passes.</p>
+  <div class="chip">
+    <div class="t"><span>MEMORY · noted 20 Aug 2025</span><span>today · 14 Nov 2026</span></div>
+    <div class="f">Is training for a half marathon</div>
+    <div class="fade"></div>
+    <div class="scale"><span>fresh</span><span>15 months later: no date shown, reply says &ldquo;Since you're training for a half marathon&hellip;&rdquo;</span></div>
+  </div>
+</div></header>
+
+<section id="findings"><div class="col">
+  <span class="lab">First results · 24 cases × 3 formats = 72 replies</span>
+  <h2>Without dates, old facts pass as fresh.</h2>
+  <p class="mut" id="setup"></p>
+  <div class="verdict" id="verdict"></div>
+  <p class="small mut">One model family, one reply per prompt. A first look, not a finding. See Method.</p>
+</div></section>
+
+<section id="map"><div class="wide">
+  <span class="lab">The decay map</span>
+  <h2>Age alone doesn&rsquo;t decide.</h2>
+  <p class="mut" style="max-width:62ch">Every dot is one reply, placed by how old the relevant memory was. Far right is old, but a sibling or a diet held for years is still safe to use, while a 15-month-old training goal is not. Click a dot to read it.</p>
+  <div class="map" id="mapBox"></div>
+  <div class="legend"><span><i style="background:var(--good)"></i>handled well</span><span><i style="background:var(--bad)"></i>used an old fact as current</span><span><i style="background:var(--grey)"></i>neither used nor checked</span><span><i style="background:var(--amber)"></i>unneeded check</span></div>
+  <ol class="notes" id="notes"></ol>
+</div></section>
+
+<section id="replies"><div class="col" style="max-width:1040px">
+  <span class="lab">Read the replies</span>
+  <h2>Same question, three ways to show memory.</h2>
+  <p class="mut">Red marks the old fact. Green marks where the assistant questioned it.</p>
+  <div class="panel">
+    <label for="caseSel" style="position:absolute;left:-9999px">Case</label><select id="caseSel"></select>
+    <div id="cellOut"></div>
+  </div>
+</div></section>
+
+<section id="cases"><div class="wide">
+  <span class="lab">The benchmark</span>
+  <h2>24 cases, four behaviours.</h2>
+  <p class="mut">Each case gives the assistant a small dated memory and a user message on 14 November 2026.</p>
+  <div class="acts">
+    <div><b>use</b>Stable or recent fact. Answer directly.</div>
+    <div><b>verify</b>Old fact that changes. Check it first.</div>
+    <div><b>update</b>Newer note replaces older. Use the newer.</div>
+    <div><b>expired</b>Event has passed. Don&rsquo;t treat as current.</div>
+  </div>
+  <div class="cases" id="caseGrid"></div>
+</div></section>
+
+<section id="method"><div class="col">
+  <span class="lab">Method</span>
+  <h2>How it works, and where it&rsquo;s weak.</h2>
+  <p>Cases are hand-written and checked by script. Each runs in three formats: plain notes, dated notes, and dated notes with a short guidance paragraph. Independent Claude runs wrote all 72 replies, scored first by rules and then read by hand. <span id="audit"></span> Two calls were borderline: the plain-notes relationship reply counts as a check because it asks whether the evening is with the named partner or someone else; the dated one counts as neither because it never names the partner.</p>
+  <ul class="g mut">
+    <li>The 365-day and 90-day horizons are my assumptions, not measurements.</li>
+    <li>24 cases, one model family, one reply per prompt. No statistics are claimed.</li>
+    <li>The guidance format states the rule, so it measures instruction-following.</li>
+    <li><b style="color:var(--ink)">Too easy in places:</b> update and expired cases score 6/6 even without dates, because the note itself says &ldquo;Joined Microsoft&rdquo; or &ldquo;interview on Nov 6&rdquo;. The next version needs implicit staleness.</li>
+    <li>Scoring rules were fixed after reading replies (5 of 72 outcomes changed), applied to every format equally.</li>
+  </ul>
+  <p><b>Next:</b> harder cases, more models, human ratings, and a confidence-decay hint attached to each note so the assistant checks only when it should.</p>
+</div></section>
+
+<footer><div class="col">STALEMEM · all memory notes are synthetic · runs entirely in your browser</div></footer>
+
+<script>
+const DATA = /*DATA*/;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const FORMATS = [["plain","Plain notes"],["dated","Dated notes"],["dated_policy","Dated + guidance"]];
+const ACTIONS = ["use","verify","update","expired"];
+const OUT = {ok:["ok","Handled well","t-ok","var(--good)"],assumed:["bad","Assumed an old fact","t-bad","var(--bad)"],stale_error:["bad","Used an outdated fact","t-bad","var(--bad)"],
+  over_verify:["warn","Unneeded check","t-grey","var(--amber)"],asked_instead:["warn","Asked instead of using","t-grey","var(--amber)"],generic:["grey","Neither used nor checked","t-grey","var(--grey)"]};
+const S = DATA.results.summary, ROWS = DATA.results.rows, C = Object.fromEntries(DATA.cases.map(c=>[c.id,c]));
+const row = (f,id) => ROWS.find(r=>r.format===f && r.case===id);
+const day = d => Date.UTC(...d.split("-").map((x,i)=>i==1?x-1:+x))/864e5;
+const TODAY = day("2026-11-14");
+const age = c => Math.round(TODAY - day(c.memory[c.memory.length-1].date));
+const pd = d => new Date(d+"T00:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+const P=S.plain, D=S.dated, G=S.dated_policy;
+
+$("setup").textContent = "The user message and today's date are identical in every format. Only the way memory is shown changes.";
+$("verdict").innerHTML = [["Plain notes",P],["Dated notes",D],["Dated + guidance",G]].map(([n,s])=>
+  `<div><div class="n ${s.stale_errors?"bad":"ok"}">${s.stale_errors}</div><div class="k">${n}</div><div class="s">old facts used as current, of ${s.stale_denominator}. Old facts checked: ${s.ok_by_action.verify} of 6.</div></div>`).join("");
+
+// decay map
+(function(){
+  const W=980,L=128,R=18,T=58,sub=26,laneGap=24,laneH=sub*4;
+  const XMAX=1420, X=v=>L+(W-L-R)*v/XMAX;
+  let svg="", y=T;
+  const H = T + 3*laneH + 2*laneGap + 44;
+  [[0,90,"<90d",.035],[90,365,"drifting · 90–365 days",.0],[365,XMAX,"old · over a year",.035]].forEach(([a,b,t,o])=>{
+    svg+=`<rect class="zone" x="${X(a)}" y="${T-14}" width="${X(b)-X(a)}" height="${H-T-18}" opacity="${o}"/><text x="${X(a)+8}" y="${T-24}">${t}</text>`;});
+  [0,365,730,1095].forEach(v=>{svg+=`<text x="${X(v)}" y="${H-8}" text-anchor="${v?"middle":"start"}">${v?v/365+" yr":"today"}</text>`;});
+  FORMATS.forEach(([f,name])=>{
+    svg+=`<text class="lane" x="6" y="${y-2}">${name.toUpperCase()}</text>`;
+    ACTIONS.forEach((a,i)=>{
+      const cy=y+i*sub+sub/2+6;
+      svg+=`<line class="row" x1="${L}" x2="${W-R}" y1="${cy}" y2="${cy}"/><text x="${L-10}" y="${cy+4}" text-anchor="end">${a}</text>`;
+      DATA.cases.filter(c=>c.gold_action===a).forEach(c=>{
+        const r=row(f,c.id), o=OUT[r.outcome], ag=age(c);
+        svg+=`<circle class="dot" data-case="${c.id}" cx="${X(ag)}" cy="${cy}" r="6.5" fill="${o[3]}"><title>${c.domain} · ${esc(c.memory[c.memory.length-1].text)} · ${ag} days old · ${o[1]}</title></circle>`;
+      });
+    });
+    y += laneH + laneGap;
+  });
+  $("mapBox").innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Each reply placed by the age of its memory, by format and required behaviour">${svg}</svg>`;
+  $("mapBox").addEventListener("click",e=>{const d=e.target.closest(".dot"); if(!d) return; $("caseSel").value=d.dataset.case; show(); $("replies").scrollIntoView({behavior:"smooth"});});
+})();
+
+$("notes").innerHTML = [
+ `<b>Dates fix most of it.</b> With plain notes, ${P.stale_errors} of ${P.stale_denominator} careful-handling cases ended with an old fact used as current, and only ${P.ok_by_action.verify} of 6 old facts were checked. With dated notes: ${D.stale_errors} stale errors and ${D.ok_by_action.verify} of 6 checked. Look at the red dots in the top lane: they sit between roughly one and two years old.`,
+ `<b>Guidance closes the last gap</b> (${D.ok_by_action.verify} → ${G.ok_by_action.verify} of 6). The one miss with dates only avoided naming the old partner but never checked the fact. This format tells the model what to do, so it shows instruction-following.`,
+ `<b>No over-checking showed up.</b> None of the 18 stable-or-recent replies drew an unneeded confirmation, even for facts years old. Six cases per format is a small test.`,
+ `<b>Update and expired are too easy as written.</b> Every format scored ${P.ok_by_action.update}/6 and ${P.ok_by_action.expired}/6, because the notes carry their own cues. That is a flaw in the cases.`
+].map(t=>`<li>${t}</li>`).join("");
+$("audit").textContent = DATA.results.n_overrides ? `${DATA.results.n_overrides} replies were overridden after reading.` : "No reply needed a manual override.";
+
+// explorer
+const sel=$("caseSel");
+sel.innerHTML = ACTIONS.map(a=>`<optgroup label="${a}">`+DATA.cases.filter(c=>c.gold_action===a).map(c=>{const t=c.memory[c.memory.length-1].text; return `<option value="${c.id}">${esc(c.domain)} · ${esc(t.slice(0,44))}${t.length>44?"…":""}</option>`}).join("")+`</optgroup>`).join("");
+sel.value="plans_verify";
+const HEDGE = "are you still[^?.]*\\?|if you(?:'re| are) still[^,.:]*|my note is from[^.,]*|tell me if[^.]*|not sure my notes[^.]*|from a while (?:back|ago)|did you already[^?]*\\?";
+function hl(text,c){
+  const words = c.stale_markers.map(m=>m.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|");
+  const re = new RegExp(`(${HEDGE})`+(words?`|(\\b(?:${words})\\w*)`:""),"gi");
+  let out="",last=0,m;
+  while((m=re.exec(text))){ out+=esc(text.slice(last,m.index)); out+=`<mark class="${m[1]?"hedge":"stale"}">${esc(m[0])}</mark>`; last=m.index+m[0].length; if(m[0].length===0) re.lastIndex++; }
+  return out+esc(text.slice(last));
+}
+function show(){
+  const c=C[sel.value];
+  $("cellOut").innerHTML=`<div class="mem">${c.memory.map(m=>`<div>${esc(m.text)}</div><small>noted ${pd(m.date)}</small>`).join("")}<p class="small mut" style="margin:8px 0 0">Today is 14 Nov 2026. Careful behaviour: <b class="mono">${c.gold_action}</b>. ${esc(c.rationale)}</p></div>
+  <div class="bubble">${esc(c.query)}</div>
+  <div class="compare">`+FORMATS.map(([f,n])=>{const r=row(f,c.id),o=OUT[r.outcome]; return `<div class="reply"><h3><span>${n}</span><span class="tag ${o[2]}">${o[1]}</span></h3><div class="txt">${hl(r.response,c)}</div></div>`}).join("")+`</div>
+  <details><summary>Show the exact prompt for each format</summary>`+FORMATS.map(([f,n])=>`<pre><b>${n}</b>\n${esc(DATA.prompts[f+"|"+c.id])}</pre>`).join("")+`</details>`;
+}
+sel.addEventListener("change",show); show();
+
+$("caseGrid").innerHTML=DATA.cases.map(c=>`<article class="cc"><h3><span>${esc(c.domain)}</span><span>${c.gold_action}</span></h3><ul>${c.memory.map(m=>`<li>${esc(m.text)} <span class="mut">(${pd(m.date)})</span></li>`).join("")}</ul><div class="q">${esc(c.query)}</div><div class="small mut">${esc(c.rationale)}</div></article>`).join("");
+</script>
+</body>
+</html>
